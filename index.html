@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tic Tac Toe - Dual Mode</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .glass {
+      backdrop-filter: blur(10px);
+      background-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .cell:hover {
+      transform: scale(1.05);
+      transition: all 0.2s;
+    }
+    .winner {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { background-color: #86efac; }
+      50% { background-color: #4ade80; }
+      100% { background-color: #86efac; }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-600 via-purple-500 to-pink-400 min-h-screen flex items-center justify-center p-4">
+  <div class="glass p-6 rounded-2xl max-w-md w-full text-white text-center shadow-xl">
+    <h1 class="text-4xl font-bold mb-4">Tic Tac Toe</h1>
+    <div class="flex justify-center gap-4 mb-4">
+      <button onclick="setMode('single')" class="bg-white text-black px-4 py-2 rounded hover:bg-gray-100">Single Player</button>
+      <button onclick="setMode('multi')" class="bg-white text-black px-4 py-2 rounded hover:bg-gray-100">Multiplayer</button>
+    </div>
+    <div id="score" class="mb-4 text-sm font-medium"></div>
+    <div id="board" class="grid grid-cols-3 gap-3 mb-6"></div>
+    <p id="status" class="text-lg font-semibold mb-4">Player X's turn</p>
+    <button onclick="resetGame()" class="bg-white text-indigo-700 font-bold px-5 py-2 rounded-full hover:bg-indigo-200 transition">Restart</button>
+  </div>
+
+  <script>
+    const board = document.getElementById('board');
+    const statusText = document.getElementById('status');
+    const scoreDiv = document.getElementById('score');
+    let currentPlayer = 'X';
+    let gameActive = true;
+    let gameState = Array(9).fill("");
+    let mode = 'multi';
+
+    const winConditions = [
+      [0,1,2], [3,4,5], [6,7,8],
+      [0,3,6], [1,4,7], [2,5,8],
+      [0,4,8], [2,4,6]
+    ];
+
+    let scores = {
+      single: { player: 0, ai: 0, draw: 0 },
+      multi: { p1: 0, p2: 0, draw: 0 }
+    };
+
+    function loadScores() {
+      const stored = JSON.parse(localStorage.getItem('tictoe_scores'));
+      if (stored) scores = stored;
+      updateScoreDisplay();
+    }
+
+    function saveScores() {
+      localStorage.setItem('tictoe_scores', JSON.stringify(scores));
+    }
+
+    function updateScoreDisplay() {
+      if (mode === 'single') {
+        scoreDiv.innerHTML = `👤 You: ${scores.single.player} | 🤖 AI: ${scores.single.ai} | ⚖️ Draws: ${scores.single.draw}`;
+      } else {
+        scoreDiv.innerHTML = `🧍‍♂️ Player 1 (X): ${scores.multi.p1} | 🧍‍♀️ Player 2 (O): ${scores.multi.p2} | ⚖️ Draws: ${scores.multi.draw}`;
+      }
+    }
+
+    function setMode(selectedMode) {
+      mode = selectedMode;
+      resetGame();
+      updateScoreDisplay();
+    }
+
+    function handleClick(index) {
+      if (!gameActive || gameState[index]) return;
+
+      gameState[index] = currentPlayer;
+      renderBoard();
+      checkWinner();
+
+      if (gameActive) {
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        statusText.textContent = `Player ${currentPlayer}'s turn`;
+
+        if (mode === 'single' && currentPlayer === 'O') {
+          setTimeout(aiMove, 500);
+        }
+      }
+    }
+
+    function aiMove() {
+      const empty = gameState.map((val, i) => val === '' ? i : null).filter(v => v !== null);
+      const move = empty[Math.floor(Math.random() * empty.length)];
+      gameState[move] = 'O';
+      renderBoard();
+      checkWinner();
+      if (gameActive) {
+        currentPlayer = 'X';
+        statusText.textContent = `Player X's turn`;
+      }
+    }
+
+    function checkWinner() {
+      for (const condition of winConditions) {
+        const [a, b, c] = condition;
+        if (gameState[a] && gameState[a] === gameState[b] && gameState[b] === gameState[c]) {
+          gameActive = false;
+          statusText.textContent = `🎉 Player ${gameState[a]} wins!`;
+          highlightWinningCells(condition);
+
+          if (mode === 'single') {
+            if (gameState[a] === 'X') scores.single.player++;
+            else scores.single.ai++;
+          } else {
+            if (gameState[a] === 'X') scores.multi.p1++;
+            else scores.multi.p2++;
+          }
+
+          saveScores();
+          updateScoreDisplay();
+          return;
+        }
+      }
+
+      if (!gameState.includes("")) {
+        gameActive = false;
+        statusText.textContent = "It's a draw!";
+        if (mode === 'single') scores.single.draw++;
+        else scores.multi.draw++;
+        saveScores();
+        updateScoreDisplay();
+      }
+    }
+
+    function highlightWinningCells(indices) {
+      const cells = board.querySelectorAll('.cell');
+      indices.forEach(i => {
+        cells[i].classList.add('winner');
+      });
+    }
+
+    function renderBoard() {
+      board.innerHTML = "";
+      gameState.forEach((cell, index) => {
+        const div = document.createElement("div");
+        div.textContent = cell;
+        div.className = "cell w-20 h-20 md:w-24 md:h-24 flex items-center justify-center text-3xl font-bold bg-white bg-opacity-20 border-2 border-white rounded-xl cursor-pointer";
+        div.onclick = () => handleClick(index);
+        board.appendChild(div);
+      });
+    }
+
+    function resetGame() {
+      gameState = Array(9).fill('');
+      currentPlayer = 'X';
+      gameActive = true;
+      statusText.textContent = "Player X's turn";
+      renderBoard();
+    }
+
+    // Init
+    loadScores();
+    resetGame();
+  </script>
+</body>
+</html>
